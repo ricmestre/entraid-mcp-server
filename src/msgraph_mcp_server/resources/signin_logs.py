@@ -1,4 +1,4 @@
- """Sign-in logs resource module for Microsoft Graph.
+"""Sign-in logs resource module for Microsoft Graph.
 
 This module provides access to Microsoft Graph sign-in logs.
 """
