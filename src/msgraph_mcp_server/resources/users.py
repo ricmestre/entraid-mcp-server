@@ -8,6 +8,9 @@ from typing import Dict, List, Optional, Any
 
 from msgraph.generated.users.users_request_builder import UsersRequestBuilder
 from kiota_abstractions.base_request_configuration import RequestConfiguration
+from msgraph.generated.directory_roles.directory_roles_request_builder import DirectoryRolesRequestBuilder
+from msgraph.generated.directory_roles.item.directory_role_item_request_builder import DirectoryRoleItemRequestBuilder
+from msgraph.generated.directory_roles.item.members.members_request_builder import MembersRequestBuilder
 
 from utils.graph_client import GraphClient
 
@@ -105,35 +108,56 @@ async def get_user_by_id(graph_client: GraphClient, user_id: str) -> Optional[Di
         logger.error(f"Error fetching user with ID {user_id}: {str(e)}")
         raise
 
-async def get_me(graph_client: GraphClient) -> Optional[Dict[str, Any]]:
-    """Get the current user's profile.
+async def get_privileged_users(graph_client: GraphClient) -> List[Dict[str, Any]]:
+    """Get all users who are members of privileged directory roles.
     
     Args:
         graph_client: GraphClient instance
     
     Returns:
-        Dictionary containing the current user's details
+        A list of dictionaries, each representing a privileged user (deduplicated).
     """
     try:
         client = graph_client.get_client()
-        ms_user = await client.me.get()
-        
-        # Convert MS Graph User to dictionary
-        user_data = {
-            'id': ms_user.id,
-            'displayName': ms_user.display_name,
-            'mail': ms_user.mail,
-            'userPrincipalName': ms_user.user_principal_name,
-            'givenName': ms_user.given_name,
-            'surname': ms_user.surname,
-            'jobTitle': ms_user.job_title,
-            'officeLocation': ms_user.office_location,
-            'businessPhones': ms_user.business_phones,
-            'mobilePhone': ms_user.mobile_phone
-        }
-        
-        return user_data
-        
+        # Get all activated directory roles
+        roles_response = await client.directory_roles.get()
+        privileged_users = {}
+        if roles_response and roles_response.value:
+            for role in roles_response.value:
+                # For each role, get its members
+                role_id = role.id
+                role_name = getattr(role, 'display_name', None)
+                if not role_id:
+                    continue
+                members_response = await client.directory_roles.by_directory_role_id(role_id).members.get()
+                if members_response and members_response.value:
+                    for member in members_response.value:
+                        # Only process user objects (type: #microsoft.graph.user)
+                        if hasattr(member, 'odata_type') and member.odata_type == '#microsoft.graph.user':
+                            user_id = getattr(member, 'id', None)
+                            if not user_id:
+                                continue
+                            # Deduplicate by user_id
+                            if user_id not in privileged_users:
+                                privileged_users[user_id] = {
+                                    'id': user_id,
+                                    'displayName': getattr(member, 'display_name', None),
+                                    'mail': getattr(member, 'mail', None),
+                                    'userPrincipalName': getattr(member, 'user_principal_name', None),
+                                    'givenName': getattr(member, 'given_name', None),
+                                    'surname': getattr(member, 'surname', None),
+                                    'jobTitle': getattr(member, 'job_title', None),
+                                    'officeLocation': getattr(member, 'office_location', None),
+                                    'businessPhones': getattr(member, 'business_phones', None),
+                                    'mobilePhone': getattr(member, 'mobile_phone', None),
+                                    'roles': set()
+                                }
+                            # Add the role name to the user's roles set
+                            privileged_users[user_id]['roles'].add(role_name)
+        # Convert roles set to list for each user
+        for user in privileged_users.values():
+            user['roles'] = list(user['roles'])
+        return list(privileged_users.values())
     except Exception as e:
-        logger.error(f"Error fetching current user: {str(e)}")
-        raise 
+        logger.error(f"Error fetching privileged users: {str(e)}")
+        raise
