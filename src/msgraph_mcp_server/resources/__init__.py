@@ -1,0 +1,1 @@
+"""Resources for accessing data from Microsoft Graph API.""" 
