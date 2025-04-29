@@ -10,7 +10,7 @@ from fastmcp import FastMCP, Context
 
 from auth.graph_auth import GraphAuthManager, AuthenticationError
 from utils.graph_client import GraphClient
-from resources import users, signin_logs, mfa, conditional_access, groups, managed_devices
+from resources import users, signin_logs, mfa, conditional_access, groups, managed_devices, audit_logs
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -333,6 +333,20 @@ async def get_managed_devices_by_user(user_id: str, ctx: Context) -> List[Dict[s
         return results
     except Exception as e:
         error_msg = f"Error fetching managed devices for user {user_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def get_user_audit_logs(user_id: str, ctx: Context, days: int = 30) -> List[Dict[str, Any]]:
+    """Get all relevant directory audit logs for a user by user_id within the last N days (default 30)."""
+    await ctx.info(f"Fetching directory audit logs for user {user_id} for the last {days} days...")
+    try:
+        results = await audit_logs.get_user_audit_logs(graph_client, user_id, days)
+        await ctx.report_progress(progress=100, total=100)
+        return results
+    except Exception as e:
+        error_msg = f"Error fetching directory audit logs for user {user_id}: {str(e)}"
         logger.error(error_msg)
         await ctx.error(error_msg)
         raise
