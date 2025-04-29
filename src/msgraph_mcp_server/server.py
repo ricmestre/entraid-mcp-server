@@ -10,7 +10,7 @@ from fastmcp import FastMCP, Context
 
 from auth.graph_auth import GraphAuthManager, AuthenticationError
 from utils.graph_client import GraphClient
-from resources import users, signin_logs, mfa, conditional_access, groups
+from resources import users, signin_logs, mfa, conditional_access, groups, managed_devices
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -305,6 +305,34 @@ async def get_user_roles(user_id: str, ctx: Context) -> List[Dict[str, Any]]:
         return results
     except Exception as e:
         error_msg = f"Error fetching roles for user {user_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def get_all_managed_devices(ctx: Context, filter_os: str = None) -> List[Dict[str, Any]]:
+    """Get all managed devices (optionally filter by OS)."""
+    await ctx.info(f"Fetching all managed devices{f' with OS {filter_os}' if filter_os else ''}...")
+    try:
+        results = await managed_devices.get_all_managed_devices(graph_client, filter_os)
+        await ctx.report_progress(progress=100, total=100)
+        return results
+    except Exception as e:
+        error_msg = f"Error fetching all managed devices: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def get_managed_devices_by_user(user_id: str, ctx: Context) -> List[Dict[str, Any]]:
+    """Get all managed devices for a specific userId."""
+    await ctx.info(f"Fetching managed devices for user {user_id}...")
+    try:
+        results = await managed_devices.get_managed_devices_by_user(graph_client, user_id)
+        await ctx.report_progress(progress=100, total=100)
+        return results
+    except Exception as e:
+        error_msg = f"Error fetching managed devices for user {user_id}: {str(e)}"
         logger.error(error_msg)
         await ctx.error(error_msg)
         raise
