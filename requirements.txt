@@ -1,5 +1,0 @@
-fastmcp>=0.1.0
-msgraph-core>=0.3.0
-azure-identity>=1.13.0
-pydantic>=1.10.0,<2.0.0
-kiota-abstractions>=0.10.0 
