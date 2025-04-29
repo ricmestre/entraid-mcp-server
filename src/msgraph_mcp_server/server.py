@@ -10,7 +10,7 @@ from fastmcp import FastMCP, Context
 
 from auth.graph_auth import GraphAuthManager, AuthenticationError
 from utils.graph_client import GraphClient
-from resources import users, signin_logs, mfa, conditional_access
+from resources import users, signin_logs, mfa, conditional_access, groups
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -235,6 +235,76 @@ async def get_conditional_access_policy_by_id(policy_id: str, ctx: Context) -> D
         return result
     except Exception as e:
         error_msg = f"Error fetching conditional access policy {policy_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def get_all_groups(ctx: Context, limit: int = 100) -> List[Dict[str, Any]]:
+    """Get all groups (up to the specified limit, with paging)."""
+    await ctx.info(f"Fetching up to {limit} groups...")
+    try:
+        results = await groups.get_all_groups(graph_client, limit)
+        await ctx.report_progress(progress=100, total=100)
+        return results
+    except Exception as e:
+        error_msg = f"Error fetching all groups: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def search_groups_by_name(name: str, ctx: Context, limit: int = 50) -> List[Dict[str, Any]]:
+    """Search for groups by display name (case-insensitive, partial match, with paging)."""
+    await ctx.info(f"Searching for groups with name matching '{name}'...")
+    try:
+        results = await groups.search_groups_by_name(graph_client, name, limit)
+        await ctx.report_progress(progress=100, total=100)
+        return results
+    except Exception as e:
+        error_msg = f"Error searching groups by name: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def get_group_members(group_id: str, ctx: Context, limit: int = 100) -> List[Dict[str, Any]]:
+    """Get members of a group by group ID (up to the specified limit, with paging)."""
+    await ctx.info(f"Fetching up to {limit} members for group {group_id}...")
+    try:
+        results = await groups.get_group_members(graph_client, group_id, limit)
+        await ctx.report_progress(progress=100, total=100)
+        return results
+    except Exception as e:
+        error_msg = f"Error fetching group members for group {group_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def get_user_groups(user_id: str, ctx: Context) -> List[Dict[str, Any]]:
+    """Get all groups (including transitive memberships) for a user by user ID."""
+    await ctx.info(f"Fetching all groups for user {user_id}...")
+    try:
+        results = await users.get_user_groups(graph_client, user_id)
+        await ctx.report_progress(progress=100, total=100)
+        return results
+    except Exception as e:
+        error_msg = f"Error fetching groups for user {user_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def get_user_roles(user_id: str, ctx: Context) -> List[Dict[str, Any]]:
+    """Get all directory roles assigned to a user by user ID."""
+    await ctx.info(f"Fetching all directory roles for user {user_id}...")
+    try:
+        results = await users.get_user_roles(graph_client, user_id)
+        await ctx.report_progress(progress=100, total=100)
+        return results
+    except Exception as e:
+        error_msg = f"Error fetching roles for user {user_id}: {str(e)}"
         logger.error(error_msg)
         await ctx.error(error_msg)
         raise
