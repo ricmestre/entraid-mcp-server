@@ -104,11 +104,19 @@ This launches an interactive development environment with the MCP Inspector. For
 - **Use least privilege:** Grant only the necessary Microsoft Graph permissions to your Azure AD app.
 - **Audit & monitor:** Use the logging output for troubleshooting and monitoring.
 
-## Requirements
-- Python 3.8+
-- Microsoft Graph SDK for Python
-- FastMCP
-- dotenv
+## Required Graph API Permissions
+| API / Permission            | Type        | Description                               |
+|-----------------------------|-------------|-------------------------------------------|
+| AuditLog.Read.All           | Application | Read all audit log data                   |
+| AuthenticationContext.Read.All | Application | Read all authentication context information |
+| DeviceManagementManagedDevices.Read.All | Application | Read Microsoft Intune devices |
+| Directory.Read.All          | Application | Read directory data                       |
+| Group.Read.All              | Application | Read all groups                           |
+| GroupMember.Read.All        | Application | Read all group memberships                |
+| Policy.Read.All             | Application | Read your organization's policies         |
+| RoleManagement.Read.Directory | Application | Read all directory RBAC settings        |
+| User.Read.All               | Application | Read all users' full profiles             |
+| UserAuthenticationMethod.Read.All | Application | Read all users' authentication methods |
 
 ## Advanced: Using with Claude or Cursor
 
