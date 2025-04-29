@@ -10,7 +10,7 @@ from fastmcp import FastMCP, Context
 
 from auth.graph_auth import GraphAuthManager, AuthenticationError
 from utils.graph_client import GraphClient
-from resources import users, signin_logs, mfa
+from resources import users, signin_logs, mfa, conditional_access
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -194,7 +194,50 @@ async def get_privileged_users(ctx: Context) -> List[Dict[str, Any]]:
         await ctx.error(f"Error fetching privileged users: {str(e)}")
         raise
 
+@mcp.tool()
+async def get_conditional_access_policies(ctx: Context) -> List[Dict[str, Any]]:
+    """Get all conditional access policies.
+    
+    Args:
+        ctx: Context object
+    
+    Returns:
+        A list of dictionaries, each representing a conditional access policy.
+    """
+    await ctx.info("Fetching conditional access policies...")
+    try:
+        policies = await conditional_access.get_conditional_access_policies(graph_client)
+        await ctx.report_progress(progress=100, total=100)
+        return policies
+    except Exception as e:
+        error_msg = f"Error fetching conditional access policies: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
 
+@mcp.tool()
+async def get_conditional_access_policy_by_id(policy_id: str, ctx: Context) -> Dict[str, Any]:
+    """Get a single conditional access policy by its ID with comprehensive details.
+    
+    Args:
+        policy_id: The unique identifier (ID) of the conditional access policy.
+        ctx: Context object
+    
+    Returns:
+        A dictionary containing the policy's details if found, otherwise an empty dict.
+    """
+    await ctx.info(f"Fetching conditional access policy with ID: {policy_id}...")
+    try:
+        result = await conditional_access.get_conditional_access_policy_by_id(graph_client, policy_id)
+        await ctx.report_progress(progress=100, total=100)
+        if not result:
+            await ctx.warning(f"Policy with ID {policy_id} not found.")
+        return result
+    except Exception as e:
+        error_msg = f"Error fetching conditional access policy {policy_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
 
 # Add a dynamic greeting resource
 @mcp.resource("greeting://{name}")

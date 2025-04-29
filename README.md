@@ -54,7 +54,7 @@ src/msgraph_mcp_server/
 You can test and develop your MCP server directly using the FastMCP CLI:
 
 ```bash
-fastmcp dev '/Users/hieutran/entraid-mcp-server/src/msgraph_mcp_server/server.py'
+fastmcp dev '/path/to/src/msgraph_mcp_server/server.py'
 ```
 
 This launches an interactive development environment with the MCP Inspector. For more information and advanced usage, see the [FastMCP documentation](https://github.com/jlowin/fastmcp).
