@@ -19,6 +19,13 @@ This project provides a modular, resource-oriented FastMCP server for interactin
 - **MFA Operations:**
   - Get MFA status for a user.
   - Get MFA status for all members of a group.
+- **Password Management:**
+  - Reset user passwords directly with custom or auto-generated secure passwords.
+  - Option to require password change on next sign-in.
+- **Permissions Helper:**
+  - Suggest appropriate Microsoft Graph permissions for common tasks.
+  - Search and explore available Graph permissions.
+  - Helps implement the principle of least privilege by recommending only necessary permissions.
 - **Error Handling & Logging:**
   - Consistent error handling and progress reporting via FastMCP context.
   - Detailed logging for troubleshooting.
@@ -32,7 +39,12 @@ This project provides a modular, resource-oriented FastMCP server for interactin
 src/msgraph_mcp_server/
 ├── auth/           # Authentication logic (GraphAuthManager)
 ├── resources/      # Resource modules (users, signin_logs, mfa, ...)
-├── utils/          # Core GraphClient
+│   ├── users.py            # User operations (search, get by ID, etc.)
+│   ├── signin_logs.py      # Sign-in log operations
+│   ├── mfa.py              # MFA status operations
+│   ├── permissions_helper.py # Graph permissions utilities and suggestions
+│   └── ...                 # Other resource modules
+├── utils/          # Core GraphClient and other ultilities tool, such as password generator..
 ├── server.py       # FastMCP server entry point (registers tools/resources)
 ├── __init__.py     # Package marker
 ```
@@ -93,6 +105,12 @@ This launches an interactive development environment with the MCP Inspector. For
 
 #### Password Management Tools
 - `reset_user_password_direct(user_id, password=None, require_change_on_next_sign_in=True, generate_password=False, password_length=12)` — Reset a user's password with a specific password value or generate a secure random password
+
+#### Permissions Helper Tools
+- `suggest_permissions_for_task(task_category, task_name)` — Suggest Microsoft Graph permissions for a specific task based on common mappings
+- `list_permission_categories_and_tasks()` — List all available categories and tasks for permission suggestions
+- `get_all_graph_permissions()` — Get all Microsoft Graph permissions directly from the Microsoft Graph API
+- `search_permissions(search_term, permission_type=None)` — Search for Microsoft Graph permissions by keyword
 
 #### Example Resource
 - `greeting://{name}` — Returns a personalized greeting
