@@ -48,3 +48,4 @@ config/.env
 # uv.lock
 # poetry.lock
 # Pipenv.lock 
+permissions-reference.md

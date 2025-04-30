@@ -10,7 +10,8 @@ from fastmcp import FastMCP, Context
 
 from auth.graph_auth import GraphAuthManager, AuthenticationError
 from utils.graph_client import GraphClient
-from resources import users, signin_logs, mfa, conditional_access, groups, managed_devices, audit_logs
+from utils.password_generator import generate_secure_password
+from resources import users, signin_logs, mfa, conditional_access, groups, managed_devices, audit_logs, password_auth, permissions_helper
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -347,6 +348,136 @@ async def get_user_audit_logs(user_id: str, ctx: Context, days: int = 30) -> Lis
         return results
     except Exception as e:
         error_msg = f"Error fetching directory audit logs for user {user_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def list_user_password_methods(user_id: str, ctx: Context) -> List[Dict[str, Any]]:
+    """List a user's password authentication methods."""
+    await ctx.info(f"Fetching password authentication methods for user {user_id}...")
+    try:
+        results = await password_auth.list_user_password_methods(graph_client, user_id)
+        await ctx.report_progress(progress=100, total=100)
+        return results
+    except Exception as e:
+        error_msg = f"Error listing password methods for user {user_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def get_user_password_method(user_id: str, method_id: str, ctx: Context) -> Optional[Dict[str, Any]]:
+    """Get a specific password authentication method for a user."""
+    await ctx.info(f"Fetching password method {method_id} for user {user_id}...")
+    try:
+        result = await password_auth.get_user_password_method(graph_client, user_id, method_id)
+        await ctx.report_progress(progress=100, total=100)
+        if not result:
+            await ctx.warning(f"Password method {method_id} not found for user {user_id}")
+        return result
+    except Exception as e:
+        error_msg = f"Error getting password method {method_id} for user {user_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def reset_user_password_direct(user_id: str, ctx: Context, password: str = None, require_change_on_next_sign_in: bool = True, generate_password: bool = False, password_length: int = 12) -> Dict[str, Any]:
+    """Reset a user's password with a specific password value.
+    
+    Args:
+        user_id: The unique identifier of the user
+        ctx: Context object
+        password: The new password to set for the user (if None and generate_password is True, a random password will be generated)
+        require_change_on_next_sign_in: Whether to require the user to change password on next sign-in (default: True)
+        generate_password: Whether to generate a random secure password (default: False)
+        password_length: Length of the generated password if generate_password is True (default: 12)
+        
+    Returns:
+        A dictionary with the operation result
+    """
+    await ctx.info(f"Directly resetting password for user {user_id}...")
+    
+    try:
+        # Generate a secure password if requested
+        if generate_password:
+            password = generate_secure_password(password_length)
+            await ctx.info(f"Generated a secure password of length {password_length}")
+        
+        # Ensure we have a password
+        if not password:
+            raise ValueError("Password must be provided or generate_password must be set to True")
+        
+        result = await password_auth.reset_user_password_direct(graph_client, user_id, password, require_change_on_next_sign_in)
+        
+        # Include the generated password in the result if we generated one
+        if generate_password:
+            result['generated_password'] = password
+            
+        await ctx.report_progress(progress=100, total=100)
+        await ctx.info(f"Password successfully reset for user {user_id} using the direct method")
+        return result
+    except Exception as e:
+        error_msg = f"Error directly resetting password for user {user_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def suggest_permissions_for_task(task_category: str, task_name: str, ctx: Context) -> Dict[str, Any]:
+    """Suggest Microsoft Graph permissions for a specific task based on common mappings."""
+    await ctx.info(f"Suggesting permissions for task '{task_category}/{task_name}'...")
+    try:
+        result = await permissions_helper.suggest_permissions_for_task(task_category, task_name)
+        await ctx.report_progress(progress=100, total=100)
+        return result
+    except Exception as e:
+        error_msg = f"Error suggesting permissions for task {task_category}/{task_name}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def list_permission_categories_and_tasks(ctx: Context) -> Dict[str, Any]:
+    """List all available categories and tasks for permission suggestions."""
+    await ctx.info("Listing available permission categories and tasks...")
+    try:
+        result = await permissions_helper.list_available_categories_and_tasks()
+        await ctx.report_progress(progress=100, total=100)
+        return result
+    except Exception as e:
+        error_msg = f"Error listing permission categories and tasks: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def get_all_graph_permissions(ctx: Context) -> Dict[str, Any]:
+    """Get all Microsoft Graph permissions directly from the Microsoft Graph API."""
+    await ctx.info("Retrieving all Microsoft Graph permissions...")
+    try:
+        result = await permissions_helper.get_all_graph_permissions(graph_client)
+        await ctx.report_progress(progress=100, total=100)
+        await ctx.info(f"Retrieved {len(result.get('delegated_permissions', []))} delegated and {len(result.get('application_permissions', []))} application permissions")
+        return result
+    except Exception as e:
+        error_msg = f"Error retrieving Microsoft Graph permissions: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def search_permissions(search_term: str, ctx: Context, permission_type: str = None) -> Dict[str, Any]:
+    """Search for Microsoft Graph permissions by keyword."""
+    await ctx.info(f"Searching for permissions with term '{search_term}'...")
+    try:
+        result = await permissions_helper.search_permissions(graph_client, search_term, permission_type)
+        await ctx.report_progress(progress=100, total=100)
+        await ctx.info(f"Found {result.get('total_matches', 0)} matching permissions")
+        return result
+    except Exception as e:
+        error_msg = f"Error searching for permissions with term '{search_term}': {str(e)}"
         logger.error(error_msg)
         await ctx.error(error_msg)
         raise

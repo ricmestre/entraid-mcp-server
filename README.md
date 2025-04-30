@@ -91,6 +91,9 @@ This launches an interactive development environment with the MCP Inspector. For
 #### Audit Log Tools
 - `get_user_audit_logs(user_id, days=30)` — Get all relevant directory audit logs for a user by user_id within the last N days
 
+#### Password Management Tools
+- `reset_user_password_direct(user_id, password=None, require_change_on_next_sign_in=True, generate_password=False, password_length=12)` — Reset a user's password with a specific password value or generate a secure random password
+
 #### Example Resource
 - `greeting://{name}` — Returns a personalized greeting
 
@@ -116,6 +119,7 @@ This launches an interactive development environment with the MCP Inspector. For
 | Policy.Read.All             | Application | Read your organization's policies         |
 | RoleManagement.Read.Directory | Application | Read all directory RBAC settings        |
 | User.Read.All               | Application | Read all users' full profiles             |
+| User-PasswordProfile.ReadWrite.All | Application | Least privileged permission to update the passwordProfile property |
 | UserAuthenticationMethod.Read.All | Application | Read all users' authentication methods |
 
 ## Advanced: Using with Claude or Cursor
