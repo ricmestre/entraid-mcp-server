@@ -18,6 +18,10 @@ This project provides a modular, resource-oriented FastMCP server for interactin
   - Create, read, update, and delete groups.
   - Add/remove group members and owners.
   - Search and list groups and group members.
+- **Application & Service Principal Management:**
+  - List, create, update, and delete applications (app registrations).
+  - List, create, update, and delete service principals.
+  - View app role assignments and delegated permissions for both applications and service principals.
 - **Sign-in Log Operations:**
   - Query sign-in logs for a user for the last X days.
 - **MFA Operations:**
@@ -47,6 +51,8 @@ src/msgraph_mcp_server/
 │   ├── signin_logs.py      # Sign-in log operations
 │   ├── mfa.py              # MFA status operations
 │   ├── permissions_helper.py # Graph permissions utilities and suggestions
+│   ├── applications.py       # Application (app registration) operations
+│   ├── service_principals.py # Service principal operations
 │   └── ...                 # Other resource modules
 ├── utils/          # Core GraphClient and other ultilities tool, such as password generator..
 ├── server.py       # FastMCP server entry point (registers tools/resources)
@@ -140,6 +146,38 @@ See the `groups.py` docstrings for more details on supported fields and behavior
 - `get_all_graph_permissions()` — Get all Microsoft Graph permissions directly from the Microsoft Graph API
 - `search_permissions(search_term, permission_type=None)` — Search for Microsoft Graph permissions by keyword
 
+#### Application Tools
+- `list_applications(ctx, limit=100)` — List all applications (app registrations) in the tenant, with paging
+- `get_application_by_id(app_id, ctx)` — Get a specific application by its object ID (includes app role assignments and delegated permissions)
+- `create_application(ctx, app_data)` — Create a new application (see below for app_data fields)
+- `update_application(app_id, ctx, app_data)` — Update an existing application (fields: displayName, signInAudience, tags, identifierUris, web, api, requiredResourceAccess)
+- `delete_application(app_id, ctx)` — Delete an application by its object ID
+
+**Application Creation/Update Example:**
+- `app_data` for `create_application` and `update_application` should be a dictionary with keys such as:
+  - `displayName` (required for create)
+  - `signInAudience` (optional)
+  - `tags` (optional)
+  - `identifierUris` (optional)
+  - `web` (optional)
+  - `api` (optional)
+  - `requiredResourceAccess` (optional)
+
+#### Service Principal Tools
+- `list_service_principals(ctx, limit=100)` — List all service principals in the tenant, with paging
+- `get_service_principal_by_id(sp_id, ctx)` — Get a specific service principal by its object ID (includes app role assignments and delegated permissions)
+- `create_service_principal(ctx, sp_data)` — Create a new service principal (see below for sp_data fields)
+- `update_service_principal(sp_id, ctx, sp_data)` — Update an existing service principal (fields: displayName, accountEnabled, tags, appRoleAssignmentRequired)
+- `delete_service_principal(sp_id, ctx)` — Delete a service principal by its object ID
+
+**Service Principal Creation/Update Example:**
+- `sp_data` for `create_service_principal` and `update_service_principal` should be a dictionary with keys such as:
+  - `appId` (required for create)
+  - `accountEnabled` (optional)
+  - `tags` (optional)
+  - `appRoleAssignmentRequired` (optional)
+  - `displayName` (optional)
+
 #### Example Resource
 - `greeting://{name}` — Returns a personalized greeting
 
@@ -168,6 +206,7 @@ See the `groups.py` docstrings for more details on supported fields and behavior
 | User.Read.All               | Application | Read all users' full profiles             |
 | User-PasswordProfile.ReadWrite.All | Application | Least privileged permission to update the passwordProfile property |
 | UserAuthenticationMethod.Read.All | Application | Read all users' authentication methods |
+| Application.ReadWrite.All   | Application | Create, update, and delete applications (app registrations) and service principals |
 
 **Note:** `Group.ReadWrite.All` is required for group creation, update, deletion, and for adding/removing group members or owners. `Group.Read.All` and `GroupMember.Read.All` are sufficient for read-only group and membership queries.
 

@@ -11,7 +11,7 @@ from fastmcp import FastMCP, Context
 from auth.graph_auth import GraphAuthManager, AuthenticationError
 from utils.graph_client import GraphClient
 from utils.password_generator import generate_secure_password
-from resources import users, signin_logs, mfa, conditional_access, groups, managed_devices, audit_logs, password_auth, permissions_helper
+from resources import users, signin_logs, mfa, conditional_access, groups, managed_devices, audit_logs, password_auth, permissions_helper, applications, service_principals
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -768,6 +768,156 @@ async def remove_group_owner(group_id: str, owner_id: str, ctx: Context) -> Dict
         return {"status": "success", "message": f"Owner {owner_id} was removed from group {group_id}"}
     except Exception as e:
         error_msg = f"Error removing owner {owner_id} from group {group_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def list_applications(ctx: Context, limit: int = 100) -> List[Dict[str, Any]]:
+    """List all applications (app registrations) in the tenant, with paging."""
+    await ctx.info(f"Listing up to {limit} applications...")
+    try:
+        results = await applications.list_applications(graph_client, limit)
+        await ctx.report_progress(progress=100, total=100)
+        return results
+    except Exception as e:
+        error_msg = f"Error listing applications: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def get_application_by_id(app_id: str, ctx: Context) -> Optional[Dict[str, Any]]:
+    """Get a specific application by its object ID."""
+    await ctx.info(f"Fetching application with ID: {app_id}...")
+    try:
+        result = await applications.get_application_by_id(graph_client, app_id)
+        await ctx.report_progress(progress=100, total=100)
+        if not result:
+            await ctx.warning(f"Application with ID {app_id} not found.")
+        return result
+    except Exception as e:
+        error_msg = f"Error fetching application {app_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def create_application(ctx: Context, app_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Create a new application (app registration)."""
+    await ctx.info(f"Creating application '{app_data.get('displayName', 'unnamed')}'...")
+    try:
+        result = await applications.create_application(graph_client, app_data)
+        await ctx.report_progress(progress=100, total=100)
+        await ctx.info(f"Successfully created application with ID: {result.get('id')}")
+        return result
+    except Exception as e:
+        error_msg = f"Error creating application: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def update_application(app_id: str, ctx: Context, app_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Update an existing application (app registration)."""
+    await ctx.info(f"Updating application {app_id}...")
+    try:
+        result = await applications.update_application(graph_client, app_id, app_data)
+        await ctx.report_progress(progress=100, total=100)
+        await ctx.info(f"Successfully updated application {app_id}")
+        return result
+    except Exception as e:
+        error_msg = f"Error updating application {app_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def delete_application(app_id: str, ctx: Context) -> Dict[str, Any]:
+    """Delete an application (app registration) by its object ID."""
+    await ctx.info(f"Deleting application {app_id}...")
+    try:
+        await applications.delete_application(graph_client, app_id)
+        await ctx.report_progress(progress=100, total=100)
+        await ctx.info(f"Successfully deleted application {app_id}")
+        return {"status": "success", "message": f"Application {app_id} was deleted successfully"}
+    except Exception as e:
+        error_msg = f"Error deleting application {app_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def list_service_principals(ctx: Context, limit: int = 100) -> List[Dict[str, Any]]:
+    """List all service principals in the tenant, with paging."""
+    await ctx.info(f"Listing up to {limit} service principals...")
+    try:
+        results = await service_principals.list_service_principals(graph_client, limit)
+        await ctx.report_progress(progress=100, total=100)
+        return results
+    except Exception as e:
+        error_msg = f"Error listing service principals: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def get_service_principal_by_id(sp_id: str, ctx: Context) -> Optional[Dict[str, Any]]:
+    """Get a specific service principal by its object ID."""
+    await ctx.info(f"Fetching service principal with ID: {sp_id}...")
+    try:
+        result = await service_principals.get_service_principal_by_id(graph_client, sp_id)
+        await ctx.report_progress(progress=100, total=100)
+        if not result:
+            await ctx.warning(f"Service principal with ID {sp_id} not found.")
+        return result
+    except Exception as e:
+        error_msg = f"Error fetching service principal {sp_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def create_service_principal(ctx: Context, sp_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Create a new service principal."""
+    await ctx.info(f"Creating service principal for appId '{sp_data.get('appId', 'unknown')}'...")
+    try:
+        result = await service_principals.create_service_principal(graph_client, sp_data)
+        await ctx.report_progress(progress=100, total=100)
+        await ctx.info(f"Successfully created service principal with ID: {result.get('id')}")
+        return result
+    except Exception as e:
+        error_msg = f"Error creating service principal: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def update_service_principal(sp_id: str, ctx: Context, sp_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Update an existing service principal."""
+    await ctx.info(f"Updating service principal {sp_id}...")
+    try:
+        result = await service_principals.update_service_principal(graph_client, sp_id, sp_data)
+        await ctx.report_progress(progress=100, total=100)
+        await ctx.info(f"Successfully updated service principal {sp_id}")
+        return result
+    except Exception as e:
+        error_msg = f"Error updating service principal {sp_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def delete_service_principal(sp_id: str, ctx: Context) -> Dict[str, Any]:
+    """Delete a service principal by its object ID."""
+    await ctx.info(f"Deleting service principal {sp_id}...")
+    try:
+        await service_principals.delete_service_principal(graph_client, sp_id)
+        await ctx.report_progress(progress=100, total=100)
+        await ctx.info(f"Successfully deleted service principal {sp_id}")
+        return {"status": "success", "message": f"Service principal {sp_id} was deleted successfully"}
+    except Exception as e:
+        error_msg = f"Error deleting service principal {sp_id}: {str(e)}"
         logger.error(error_msg)
         await ctx.error(error_msg)
         raise
