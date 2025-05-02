@@ -255,6 +255,22 @@ async def get_all_groups(ctx: Context, limit: int = 100) -> List[Dict[str, Any]]
         raise
 
 @mcp.tool()
+async def get_group_by_id(group_id: str, ctx: Context) -> Optional[Dict[str, Any]]:
+    """Get a specific group by its ID."""
+    await ctx.info(f"Fetching group with ID: {group_id}...")
+    try:
+        result = await groups.get_group_by_id(graph_client, group_id)
+        await ctx.report_progress(progress=100, total=100)
+        if not result:
+            await ctx.warning(f"Group with ID {group_id} not found.")
+        return result
+    except Exception as e:
+        error_msg = f"Error fetching group {group_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
 async def search_groups_by_name(name: str, ctx: Context, limit: int = 50) -> List[Dict[str, Any]]:
     """Search for groups by display name (case-insensitive, partial match, with paging)."""
     await ctx.info(f"Searching for groups with name matching '{name}'...")
@@ -478,6 +494,280 @@ async def search_permissions(search_term: str, ctx: Context, permission_type: st
         return result
     except Exception as e:
         error_msg = f"Error searching for permissions with term '{search_term}': {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def create_group(ctx: Context, group_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Create a new group in Microsoft Graph.
+    
+    Args:
+        ctx: Context object
+        group_data: Dictionary containing group properties:
+          - displayName: Display name of the group (required)
+          - mailNickname: Mail alias for the group (required)
+          - description: Description of the group (optional)
+          - groupTypes: Array of group types e.g. ["Unified"] (optional)
+          - mailEnabled: Whether the group is mail-enabled (optional)
+          - securityEnabled: Whether the group is a security group (optional)
+          - visibility: "Private" or "Public" for Microsoft 365 groups (optional)
+          - owners: List of user IDs to add as owners (optional)
+          - members: List of IDs to add as members (optional)
+          - membershipRule: Rule for dynamic groups (required if DynamicMembership is in groupTypes)
+          - membershipRuleProcessingState: "On" or "Paused" for dynamic groups (default: "On")
+        
+    Returns:
+        The created group data with status field if group already exists
+    """
+    await ctx.info(f"Creating group '{group_data.get('displayName', 'unnamed')}'...")
+    
+    try:
+        # Validate required fields
+        if not group_data.get('displayName'):
+            raise ValueError("displayName is required for creating a group")
+            
+        if not group_data.get('mailNickname'):
+            raise ValueError("mailNickname is required for creating a group")
+        
+        # Check if this is a dynamic membership group
+        group_types = group_data.get('groupTypes', [])
+        is_dynamic = 'DynamicMembership' in group_types
+        
+        # Validate dynamic group requirements
+        if is_dynamic:
+            if not group_data.get('membershipRule'):
+                raise ValueError("membershipRule is required for dynamic membership groups")
+            
+            await ctx.info("Creating dynamic membership group with rule: " + group_data.get('membershipRule', ''))
+            
+        result = await groups.create_group(graph_client, group_data)
+        await ctx.report_progress(progress=100, total=100)
+        
+        # Check if the group already existed
+        if result.get('status') == 'already_exists':
+            await ctx.info(f"Group with display name '{result.get('displayName')}' already exists (ID: {result.get('id')})")
+        else:
+            await ctx.info(f"Successfully created group with ID: {result.get('id')}")
+            
+            # For dynamic groups, inform about membership management
+            if is_dynamic:
+                await ctx.info("Created dynamic membership group. Members are managed automatically based on the membership rule.")
+                
+        return result
+    except Exception as e:
+        error_msg = f"Error creating group: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def update_group(group_id: str, ctx: Context, group_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Update an existing group in Microsoft Graph.
+    
+    Args:
+        group_id: ID of the group to update
+        ctx: Context object
+        group_data: Dictionary containing group properties to update:
+          - displayName: Display name of the group (optional)
+          - mailNickname: Mail alias for the group (optional)
+          - description: Description of the group (optional)
+          - visibility: "Private" or "Public" for Microsoft 365 groups (optional)
+        
+    Returns:
+        The updated group data
+    """
+    await ctx.info(f"Updating group {group_id}...")
+    
+    try:
+        result = await groups.update_group(graph_client, group_id, group_data)
+        await ctx.report_progress(progress=100, total=100)
+        await ctx.info(f"Successfully updated group {group_id}")
+        return result
+    except Exception as e:
+        error_msg = f"Error updating group {group_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def delete_group(group_id: str, ctx: Context) -> Dict[str, Any]:
+    """Delete a group from Microsoft Graph.
+    
+    Args:
+        group_id: ID of the group to delete
+        ctx: Context object
+        
+    Returns:
+        A dictionary with the operation result
+    """
+    await ctx.info(f"Deleting group {group_id}...")
+    
+    try:
+        await groups.delete_group(graph_client, group_id)
+        await ctx.report_progress(progress=100, total=100)
+        await ctx.info(f"Successfully deleted group {group_id}")
+        return {"status": "success", "message": f"Group {group_id} was deleted successfully"}
+    except Exception as e:
+        error_msg = f"Error deleting group {group_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def add_group_member(group_id: str, member_id: str, ctx: Context) -> Dict[str, Any]:
+    """Add a member to a group.
+    
+    Args:
+        group_id: ID of the group
+        member_id: ID of the member (user, group, device, etc.) to add
+        ctx: Context object
+        
+    Returns:
+        A dictionary with the operation result
+    """
+    await ctx.info(f"Adding member {member_id} to group {group_id}...")
+    
+    try:
+        # Try to get the group first to verify if it's a dynamic group
+        group = await groups.get_group_by_id(graph_client, group_id)
+        if not group:
+            raise ValueError(f"Group with ID {group_id} not found")
+            
+        # Check if this is a dynamic membership group
+        if group.get('groupTypes') and 'DynamicMembership' in group.get('groupTypes'):
+            error_msg = "Cannot add members to a dynamic membership group. Members are determined by the membership rule."
+            await ctx.warning(error_msg)
+            return {
+                "status": "error", 
+                "message": error_msg,
+                "groupId": group_id,
+                "memberId": member_id,
+                "isDynamicGroup": True
+            }
+        
+        # Try to add the member
+        await groups.add_group_member(graph_client, group_id, member_id)
+        await ctx.report_progress(progress=100, total=100)
+        await ctx.info(f"Successfully added member {member_id} to group {group_id}")
+        return {"status": "success", "message": f"Member {member_id} was added to group {group_id}"}
+    except ValueError as e:
+        # Handle case where member is already in group
+        if "already in group" in str(e).lower():
+            message = f"Member {member_id} is already in group {group_id}"
+            await ctx.info(message)
+            return {"status": "already_exists", "message": message}
+        # Otherwise re-raise
+        logger.error(f"Value error adding member {member_id} to group {group_id}: {str(e)}")
+        await ctx.error(str(e))
+        raise
+    except Exception as e:
+        error_msg = f"Error adding member {member_id} to group {group_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def remove_group_member(group_id: str, member_id: str, ctx: Context) -> Dict[str, Any]:
+    """Remove a member from a group.
+    
+    Args:
+        group_id: ID of the group
+        member_id: ID of the member to remove
+        ctx: Context object
+        
+    Returns:
+        A dictionary with the operation result
+    """
+    await ctx.info(f"Removing member {member_id} from group {group_id}...")
+    
+    try:
+        # Try to get the group first to verify if it's a dynamic group
+        group = await groups.get_group_by_id(graph_client, group_id)
+        if not group:
+            raise ValueError(f"Group with ID {group_id} not found")
+            
+        # Check if this is a dynamic membership group
+        if group.get('groupTypes') and 'DynamicMembership' in group.get('groupTypes'):
+            error_msg = "Cannot remove members from a dynamic membership group. Members are determined by the membership rule."
+            await ctx.warning(error_msg)
+            return {
+                "status": "error", 
+                "message": error_msg,
+                "groupId": group_id,
+                "memberId": member_id,
+                "isDynamicGroup": True
+            }
+            
+        # Try to remove the member
+        result = await groups.remove_group_member(graph_client, group_id, member_id)
+        await ctx.report_progress(progress=100, total=100)
+        
+        # If we reach here, it was successful (either removed or wasn't a member)
+        await ctx.info(f"Successfully removed member {member_id} from group {group_id}")
+        return {"status": "success", "message": f"Member {member_id} was removed from group {group_id}"}
+    except ValueError as e:
+        # Handle case where member is not in group
+        if "not found in group" in str(e).lower():
+            message = f"Member {member_id} is not in group {group_id}"
+            await ctx.info(message)
+            return {"status": "not_found", "message": message}
+        # Otherwise re-raise
+        logger.error(f"Value error removing member {member_id} from group {group_id}: {str(e)}")
+        await ctx.error(str(e))
+        raise
+    except Exception as e:
+        error_msg = f"Error removing member {member_id} from group {group_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def add_group_owner(group_id: str, owner_id: str, ctx: Context) -> Dict[str, Any]:
+    """Add an owner to a group.
+    
+    Args:
+        group_id: ID of the group
+        owner_id: ID of the user to add as owner
+        ctx: Context object
+        
+    Returns:
+        A dictionary with the operation result
+    """
+    await ctx.info(f"Adding owner {owner_id} to group {group_id}...")
+    
+    try:
+        await groups.add_group_owner(graph_client, group_id, owner_id)
+        await ctx.report_progress(progress=100, total=100)
+        await ctx.info(f"Successfully added owner {owner_id} to group {group_id}")
+        return {"status": "success", "message": f"Owner {owner_id} was added to group {group_id}"}
+    except Exception as e:
+        error_msg = f"Error adding owner {owner_id} to group {group_id}: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+@mcp.tool()
+async def remove_group_owner(group_id: str, owner_id: str, ctx: Context) -> Dict[str, Any]:
+    """Remove an owner from a group.
+    
+    Args:
+        group_id: ID of the group
+        owner_id: ID of the owner to remove
+        ctx: Context object
+        
+    Returns:
+        A dictionary with the operation result
+    """
+    await ctx.info(f"Removing owner {owner_id} from group {group_id}...")
+    
+    try:
+        await groups.remove_group_owner(graph_client, group_id, owner_id)
+        await ctx.report_progress(progress=100, total=100)
+        await ctx.info(f"Successfully removed owner {owner_id} from group {group_id}")
+        return {"status": "success", "message": f"Owner {owner_id} was removed from group {group_id}"}
+    except Exception as e:
+        error_msg = f"Error removing owner {owner_id} from group {group_id}: {str(e)}"
         logger.error(error_msg)
         await ctx.error(error_msg)
         raise

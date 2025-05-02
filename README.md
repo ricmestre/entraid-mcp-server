@@ -14,6 +14,10 @@ This project provides a modular, resource-oriented FastMCP server for interactin
   - Search users by name/email.
   - Get user by ID.
   - List all privileged users (directory role members).
+- **Full Group Lifecycle & Membership Management:**
+  - Create, read, update, and delete groups.
+  - Add/remove group members and owners.
+  - Search and list groups and group members.
 - **Sign-in Log Operations:**
   - Query sign-in logs for a user for the last X days.
 - **MFA Operations:**
@@ -81,9 +85,33 @@ This launches an interactive development environment with the MCP Inspector. For
 - `get_user_groups(user_id, ctx)` — Get all groups (including transitive memberships) for a user
 
 #### Group Tools
-- `get_all_groups(limit=100)` — Get all groups (with paging)
-- `search_groups_by_name(name, limit=50)` — Search for groups by display name
-- `get_group_members(group_id, limit=100)` — Get members of a group by group ID
+- `get_all_groups(ctx, limit=100)` — Get all groups (with paging)
+- `get_group_by_id(group_id, ctx)` — Get a specific group by its ID
+- `search_groups_by_name(name, ctx, limit=50)` — Search for groups by display name
+- `get_group_members(group_id, ctx, limit=100)` — Get members of a group by group ID
+- `create_group(ctx, group_data)` — Create a new group (see below for group_data fields)
+- `update_group(group_id, ctx, group_data)` — Update an existing group (fields: displayName, mailNickname, description, visibility)
+- `delete_group(group_id, ctx)` — Delete a group by its ID
+- `add_group_member(group_id, member_id, ctx)` — Add a member (user, group, device, etc.) to a group
+- `remove_group_member(group_id, member_id, ctx)` — Remove a member from a group
+- `add_group_owner(group_id, owner_id, ctx)` — Add an owner to a group
+- `remove_group_owner(group_id, owner_id, ctx)` — Remove an owner from a group
+
+**Group Creation/Update Example:**
+- `group_data` for `create_group` and `update_group` should be a dictionary with keys such as:
+  - `displayName` (required for create)
+  - `mailNickname` (required for create)
+  - `description` (optional)
+  - `groupTypes` (optional, e.g., `["Unified"]`)
+  - `mailEnabled` (optional)
+  - `securityEnabled` (optional)
+  - `visibility` (optional, "Private" or "Public")
+  - `owners` (optional, list of user IDs)
+  - `members` (optional, list of IDs)
+  - `membershipRule` (required for dynamic groups)
+  - `membershipRuleProcessingState` (optional, "On" or "Paused")
+
+See the `groups.py` docstrings for more details on supported fields and behaviors.
 
 #### Sign-in Log Tools
 - `get_user_sign_ins(user_id, ctx, days=7)` — Get sign-in logs for a user
@@ -134,11 +162,14 @@ This launches an interactive development environment with the MCP Inspector. For
 | Directory.Read.All          | Application | Read directory data                       |
 | Group.Read.All              | Application | Read all groups                           |
 | GroupMember.Read.All        | Application | Read all group memberships                |
+| Group.ReadWrite.All         | Application | Create, update, delete groups; manage group members and owners |
 | Policy.Read.All             | Application | Read your organization's policies         |
 | RoleManagement.Read.Directory | Application | Read all directory RBAC settings        |
 | User.Read.All               | Application | Read all users' full profiles             |
 | User-PasswordProfile.ReadWrite.All | Application | Least privileged permission to update the passwordProfile property |
 | UserAuthenticationMethod.Read.All | Application | Read all users' authentication methods |
+
+**Note:** `Group.ReadWrite.All` is required for group creation, update, deletion, and for adding/removing group members or owners. `Group.Read.All` and `GroupMember.Read.All` are sufficient for read-only group and membership queries.
 
 ## Advanced: Using with Claude or Cursor
 
