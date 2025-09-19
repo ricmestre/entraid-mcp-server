@@ -8,6 +8,7 @@ from typing import Dict, List, Any, Optional
 from msgraph.generated.groups.groups_request_builder import GroupsRequestBuilder
 from msgraph.generated.models.group import Group
 from msgraph.generated.models.directory_object import DirectoryObject
+from msgraph.generated.models.reference_create import ReferenceCreate
 from utils.graph_client import GraphClient
 
 logger = logging.getLogger(__name__)
@@ -377,11 +378,12 @@ async def add_group_member(graph_client: GraphClient, group_id: str, member_id: 
             pass
         
         # Create a reference to the directory object (member)
-        directory_object = DirectoryObject()
-        directory_object.id = member_id
+        request_body = ReferenceCreate(
+	        odata_id = f"https://graph.microsoft.com/v1.0/directoryObjects/{member_id}",
+        )
         
         # Add the member to the group
-        await client.groups.by_group_id(group_id).members.ref.post(directory_object)
+        await client.groups.by_group_id(group_id).members.ref.post(request_body)
         
         return True
     except Exception as e:
