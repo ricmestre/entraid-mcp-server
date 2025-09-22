@@ -46,16 +46,16 @@ async def search_users(graph_client: GraphClient, query: str, limit: int = 10) -
         formatted_users = []
         for user in users[:limit]:
             user_data = {
-                'id': user.id,
-                'displayName': user.display_name,
-                'mail': user.mail,
-                'userPrincipalName': user.user_principal_name,
-                'givenName': user.given_name,
-                'surname': user.surname,
-                'jobTitle': user.job_title,
-                'officeLocation': user.office_location,
-                'businessPhones': user.business_phones,
-                'mobilePhone': user.mobile_phone
+                'id': user.id or '',
+                'displayName': getattr(user, 'display_name', None) or '',
+                'mail': getattr(user, 'mail', None) or '',
+                'userPrincipalName': getattr(user, 'user_principal_name', None) or '',
+                'givenName': getattr(user, 'given_name', None) or '',
+                'surname': getattr(user, 'surname', None) or '',
+                'jobTitle': getattr(user, 'job_title', None) or '',
+                'officeLocation': getattr(user, 'office_location', None) or '',
+                'businessPhones': ", ".join(getattr(user, 'business_phones', [])) if getattr(user, 'business_phones', []) else '',
+                'mobilePhone': getattr(user, 'mobile_phone', None) or ''
             }
             formatted_users.append(user_data)
         return formatted_users
